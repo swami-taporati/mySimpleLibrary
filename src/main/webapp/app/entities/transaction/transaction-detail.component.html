@@ -1,0 +1,46 @@
+<div class="row justify-content-center">
+    <div class="col-8">
+        <div *ngIf="transaction">
+            <h2><span>Transaction</span> {{ transaction.id }}</h2>
+
+            <hr>
+
+            <jhi-alert-error></jhi-alert-error>
+
+            <dl class="row-md jh-entity-details">
+                <dt><span>Borrow Date</span></dt>
+                <dd>
+                    <span>{{ transaction.borrowDate }}</span>
+                </dd>
+                <dt><span>Return Date</span></dt>
+                <dd>
+                    <span>{{ transaction.returnDate }}</span>
+                </dd>
+                <dt><span>Book</span></dt>
+                <dd>
+                    <div *ngIf="transaction.book">
+                        <a [routerLink]="['/book', transaction.book?.id, 'view']">{{ transaction.book?.name }}</a>
+                    </div>
+                </dd>
+                <dt><span>Client</span></dt>
+                <dd>
+                    <div *ngIf="transaction.client">
+                        <a [routerLink]="['/client', transaction.client?.id, 'view']">{{ transaction.client?.email }}</a>
+                    </div>
+                </dd>
+            </dl>
+
+            <button type="submit"
+                    (click)="previousState()"
+                    class="btn btn-info">
+                <fa-icon icon="arrow-left"></fa-icon>&nbsp;<span>Back</span>
+            </button>
+
+            <button type="button"
+                    [routerLink]="['/transaction', transaction.id, 'edit']"
+                    class="btn btn-primary">
+                <fa-icon icon="pencil-alt"></fa-icon>&nbsp;<span>Edit</span>
+            </button>
+        </div>
+    </div>
+</div>
