@@ -12,6 +12,7 @@ import { IBook } from 'app/shared/model/book.model';
 import { BookService } from 'app/entities/book/book.service';
 import { IClient } from 'app/shared/model/client.model';
 import { ClientService } from 'app/entities/client/client.service';
+import { BookStatus } from 'app/shared/model/enumerations/book-status.model';
 
 type SelectableEntity = IBook | IClient;
 
@@ -23,8 +24,10 @@ export class TransactionUpdateComponent implements OnInit {
   isSaving = false;
   books: IBook[] = [];
   clients: IClient[] = [];
+  clients2: IClient[] = [];
   borrowDateDp: any;
   returnDateDp: any;
+  status: BookStatus = BookStatus.AVAILABLE;
 
   editForm = this.fb.group({
     id: [],
@@ -47,7 +50,8 @@ export class TransactionUpdateComponent implements OnInit {
       this.updateForm(transaction);
 
       this.bookService
-        .query({ 'transactionId.specified': 'false' })
+        // .query({ 'transactionId.specified': 'false' })
+        .query({ 'status.in': 'AVAILABLE' }) // to get only the available books from server
         .pipe(
           map((res: HttpResponse<IBook[]>) => {
             return res.body || [];
@@ -109,10 +113,17 @@ export class TransactionUpdateComponent implements OnInit {
   save(): void {
     this.isSaving = true;
     const transaction = this.createFromForm();
+
     if (transaction.id !== undefined) {
       this.subscribeToSaveResponse(this.transactionService.update(transaction));
     } else {
       this.subscribeToSaveResponse(this.transactionService.create(transaction));
+      // const tempBook = transaction.book;
+      // if(tempBook !== undefined)
+      // {
+      //   tempBook.status = BookStatus.BORROWED;
+      //   this.subscribeToSaveResponse(this.bookService.update(tempBook));
+      // }
     }
   }
 

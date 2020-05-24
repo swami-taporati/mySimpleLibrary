@@ -1,17 +1,18 @@
 package com.ishasamskriti.mylib.service.impl;
 
-import com.ishasamskriti.mylib.service.TransactionService;
+import static org.elasticsearch.index.query.QueryBuilders.*;
+
 import com.ishasamskriti.mylib.domain.Transaction;
 import com.ishasamskriti.mylib.repository.TransactionRepository;
+import com.ishasamskriti.mylib.repository.search.TransactionSearchRepository;
+import com.ishasamskriti.mylib.service.TransactionService;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 /**
  * Service Implementation for managing {@link Transaction}.
@@ -19,13 +20,15 @@ import java.util.Optional;
 @Service
 @Transactional
 public class TransactionServiceImpl implements TransactionService {
-
     private final Logger log = LoggerFactory.getLogger(TransactionServiceImpl.class);
 
     private final TransactionRepository transactionRepository;
 
-    public TransactionServiceImpl(TransactionRepository transactionRepository) {
+    private final TransactionSearchRepository transactionSearchRepository;
+
+    public TransactionServiceImpl(TransactionRepository transactionRepository, TransactionSearchRepository transactionSearchRepository) {
         this.transactionRepository = transactionRepository;
+        this.transactionSearchRepository = transactionSearchRepository;
     }
 
     /**
@@ -37,7 +40,9 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public Transaction save(Transaction transaction) {
         log.debug("Request to save Transaction : {}", transaction);
-        return transactionRepository.save(transaction);
+        Transaction result = transactionRepository.save(transaction);
+        transactionSearchRepository.save(result);
+        return result;
     }
 
     /**
@@ -52,7 +57,6 @@ public class TransactionServiceImpl implements TransactionService {
         log.debug("Request to get all Transactions");
         return transactionRepository.findAll(pageable);
     }
-
 
     /**
      * Get one transaction by id.
@@ -77,5 +81,20 @@ public class TransactionServiceImpl implements TransactionService {
         log.debug("Request to delete Transaction : {}", id);
 
         transactionRepository.deleteById(id);
+        transactionSearchRepository.deleteById(id);
+    }
+
+    /**
+     * Search for the transaction corresponding to the query.
+     *
+     * @param query the query of the search.
+     * @param pageable the pagination information.
+     * @return the list of entities.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Transaction> search(String query, Pageable pageable) {
+        log.debug("Request to search for a page of Transactions for query {}", query);
+        return transactionSearchRepository.search(queryStringQuery(query), pageable);
     }
 }

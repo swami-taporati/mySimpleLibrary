@@ -1,17 +1,14 @@
 package com.ishasamskriti.mylib.service;
 
 import com.ishasamskriti.mylib.domain.Client;
-
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import java.util.Optional;
 
 /**
  * Service Interface for managing {@link Client}.
  */
 public interface ClientService {
-
     /**
      * Save a client.
      *
@@ -28,7 +25,6 @@ public interface ClientService {
      */
     Page<Client> findAll(Pageable pageable);
 
-
     /**
      * Get the "id" client.
      *
@@ -43,4 +39,14 @@ public interface ClientService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Search for the client corresponding to the query.
+     *
+     * @param query the query of the search.
+     *
+     * @param pageable the pagination information.
+     * @return the list of entities.
+     */
+    Page<Client> search(String query, Pageable pageable);
 }

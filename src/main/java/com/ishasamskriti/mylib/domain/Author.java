@@ -1,15 +1,14 @@
 package com.ishasamskriti.mylib.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
-
-import javax.persistence.*;
-import javax.validation.constraints.*;
-
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
+import javax.persistence.*;
+import javax.validation.constraints.*;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.springframework.data.elasticsearch.annotations.FieldType;
 
 /**
  * A Author.
@@ -17,8 +16,8 @@ import java.util.Set;
 @Entity
 @Table(name = "author")
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+@org.springframework.data.elasticsearch.annotations.Document(indexName = "author")
 public class Author implements Serializable {
-
     private static final long serialVersionUID = 1L;
 
     @Id
@@ -99,6 +98,7 @@ public class Author implements Serializable {
     public void setBooks(Set<Book> books) {
         this.books = books;
     }
+
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here
 
     @Override

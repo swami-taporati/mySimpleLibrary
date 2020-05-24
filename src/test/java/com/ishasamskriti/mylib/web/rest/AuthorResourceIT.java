@@ -1,38 +1,46 @@
 package com.ishasamskriti.mylib.web.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.elasticsearch.index.query.QueryBuilders.queryStringQuery;
+import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.ishasamskriti.mylib.MySimpleLibraryApp;
 import com.ishasamskriti.mylib.domain.Author;
 import com.ishasamskriti.mylib.domain.Book;
 import com.ishasamskriti.mylib.repository.AuthorRepository;
+import com.ishasamskriti.mylib.repository.search.AuthorSearchRepository;
+import com.ishasamskriti.mylib.service.AuthorQueryService;
 import com.ishasamskriti.mylib.service.AuthorService;
 import com.ishasamskriti.mylib.service.dto.AuthorCriteria;
-import com.ishasamskriti.mylib.service.AuthorQueryService;
-
+import java.util.Collections;
+import java.util.List;
+import javax.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import javax.persistence.EntityManager;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasItem;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Integration tests for the {@link AuthorResource} REST controller.
  */
 @SpringBootTest(classes = MySimpleLibraryApp.class)
+@ExtendWith(MockitoExtension.class)
 @AutoConfigureMockMvc
 @WithMockUser
 public class AuthorResourceIT {
-
     private static final String DEFAULT_FIRST_NAME = "AAAAAAAAAA";
     private static final String UPDATED_FIRST_NAME = "BBBBBBBBBB";
 
@@ -44,6 +52,14 @@ public class AuthorResourceIT {
 
     @Autowired
     private AuthorService authorService;
+
+    /**
+     * This repository is mocked in the com.ishasamskriti.mylib.repository.search test package.
+     *
+     * @see com.ishasamskriti.mylib.repository.search.AuthorSearchRepositoryMockConfiguration
+     */
+    @Autowired
+    private AuthorSearchRepository mockAuthorSearchRepository;
 
     @Autowired
     private AuthorQueryService authorQueryService;
@@ -63,11 +79,10 @@ public class AuthorResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Author createEntity(EntityManager em) {
-        Author author = new Author()
-            .firstName(DEFAULT_FIRST_NAME)
-            .lastName(DEFAULT_LAST_NAME);
+        Author author = new Author().firstName(DEFAULT_FIRST_NAME).lastName(DEFAULT_LAST_NAME);
         return author;
     }
+
     /**
      * Create an updated entity for this test.
      *
@@ -75,9 +90,7 @@ public class AuthorResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Author createUpdatedEntity(EntityManager em) {
-        Author author = new Author()
-            .firstName(UPDATED_FIRST_NAME)
-            .lastName(UPDATED_LAST_NAME);
+        Author author = new Author().firstName(UPDATED_FIRST_NAME).lastName(UPDATED_LAST_NAME);
         return author;
     }
 
@@ -91,9 +104,8 @@ public class AuthorResourceIT {
     public void createAuthor() throws Exception {
         int databaseSizeBeforeCreate = authorRepository.findAll().size();
         // Create the Author
-        restAuthorMockMvc.perform(post("/api/authors")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(author)))
+        restAuthorMockMvc
+            .perform(post("/api/authors").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(author)))
             .andExpect(status().isCreated());
 
         // Validate the Author in the database
@@ -102,6 +114,9 @@ public class AuthorResourceIT {
         Author testAuthor = authorList.get(authorList.size() - 1);
         assertThat(testAuthor.getFirstName()).isEqualTo(DEFAULT_FIRST_NAME);
         assertThat(testAuthor.getLastName()).isEqualTo(DEFAULT_LAST_NAME);
+
+        // Validate the Author in Elasticsearch
+        verify(mockAuthorSearchRepository, times(1)).save(testAuthor);
     }
 
     @Test
@@ -113,16 +128,17 @@ public class AuthorResourceIT {
         author.setId(1L);
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        restAuthorMockMvc.perform(post("/api/authors")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(author)))
+        restAuthorMockMvc
+            .perform(post("/api/authors").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(author)))
             .andExpect(status().isBadRequest());
 
         // Validate the Author in the database
         List<Author> authorList = authorRepository.findAll();
         assertThat(authorList).hasSize(databaseSizeBeforeCreate);
-    }
 
+        // Validate the Author in Elasticsearch
+        verify(mockAuthorSearchRepository, times(0)).save(author);
+    }
 
     @Test
     @Transactional
@@ -133,10 +149,8 @@ public class AuthorResourceIT {
 
         // Create the Author, which fails.
 
-
-        restAuthorMockMvc.perform(post("/api/authors")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(author)))
+        restAuthorMockMvc
+            .perform(post("/api/authors").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(author)))
             .andExpect(status().isBadRequest());
 
         List<Author> authorList = authorRepository.findAll();
@@ -152,10 +166,8 @@ public class AuthorResourceIT {
 
         // Create the Author, which fails.
 
-
-        restAuthorMockMvc.perform(post("/api/authors")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(author)))
+        restAuthorMockMvc
+            .perform(post("/api/authors").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(author)))
             .andExpect(status().isBadRequest());
 
         List<Author> authorList = authorRepository.findAll();
@@ -169,14 +181,15 @@ public class AuthorResourceIT {
         authorRepository.saveAndFlush(author);
 
         // Get all the authorList
-        restAuthorMockMvc.perform(get("/api/authors?sort=id,desc"))
+        restAuthorMockMvc
+            .perform(get("/api/authors?sort=id,desc"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(author.getId().intValue())))
             .andExpect(jsonPath("$.[*].firstName").value(hasItem(DEFAULT_FIRST_NAME)))
             .andExpect(jsonPath("$.[*].lastName").value(hasItem(DEFAULT_LAST_NAME)));
     }
-    
+
     @Test
     @Transactional
     public void getAuthor() throws Exception {
@@ -184,14 +197,14 @@ public class AuthorResourceIT {
         authorRepository.saveAndFlush(author);
 
         // Get the author
-        restAuthorMockMvc.perform(get("/api/authors/{id}", author.getId()))
+        restAuthorMockMvc
+            .perform(get("/api/authors/{id}", author.getId()))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(author.getId().intValue()))
             .andExpect(jsonPath("$.firstName").value(DEFAULT_FIRST_NAME))
             .andExpect(jsonPath("$.lastName").value(DEFAULT_LAST_NAME));
     }
-
 
     @Test
     @Transactional
@@ -210,7 +223,6 @@ public class AuthorResourceIT {
         defaultAuthorShouldBeFound("id.lessThanOrEqual=" + id);
         defaultAuthorShouldNotBeFound("id.lessThan=" + id);
     }
-
 
     @Test
     @Transactional
@@ -263,7 +275,8 @@ public class AuthorResourceIT {
         // Get all the authorList where firstName is null
         defaultAuthorShouldNotBeFound("firstName.specified=false");
     }
-                @Test
+
+    @Test
     @Transactional
     public void getAllAuthorsByFirstNameContainsSomething() throws Exception {
         // Initialize the database
@@ -288,7 +301,6 @@ public class AuthorResourceIT {
         // Get all the authorList where firstName does not contain UPDATED_FIRST_NAME
         defaultAuthorShouldBeFound("firstName.doesNotContain=" + UPDATED_FIRST_NAME);
     }
-
 
     @Test
     @Transactional
@@ -341,7 +353,8 @@ public class AuthorResourceIT {
         // Get all the authorList where lastName is null
         defaultAuthorShouldNotBeFound("lastName.specified=false");
     }
-                @Test
+
+    @Test
     @Transactional
     public void getAllAuthorsByLastNameContainsSomething() throws Exception {
         // Initialize the database
@@ -367,7 +380,6 @@ public class AuthorResourceIT {
         defaultAuthorShouldBeFound("lastName.doesNotContain=" + UPDATED_LAST_NAME);
     }
 
-
     @Test
     @Transactional
     public void getAllAuthorsByBookIsEqualToSomething() throws Exception {
@@ -391,7 +403,8 @@ public class AuthorResourceIT {
      * Executes the search, and checks that the default entity is returned.
      */
     private void defaultAuthorShouldBeFound(String filter) throws Exception {
-        restAuthorMockMvc.perform(get("/api/authors?sort=id,desc&" + filter))
+        restAuthorMockMvc
+            .perform(get("/api/authors?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(author.getId().intValue())))
@@ -399,7 +412,8 @@ public class AuthorResourceIT {
             .andExpect(jsonPath("$.[*].lastName").value(hasItem(DEFAULT_LAST_NAME)));
 
         // Check, that the count call also returns 1
-        restAuthorMockMvc.perform(get("/api/authors/count?sort=id,desc&" + filter))
+        restAuthorMockMvc
+            .perform(get("/api/authors/count?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(content().string("1"));
@@ -409,14 +423,16 @@ public class AuthorResourceIT {
      * Executes the search, and checks that the default entity is not returned.
      */
     private void defaultAuthorShouldNotBeFound(String filter) throws Exception {
-        restAuthorMockMvc.perform(get("/api/authors?sort=id,desc&" + filter))
+        restAuthorMockMvc
+            .perform(get("/api/authors?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$").isEmpty());
 
         // Check, that the count call also returns 0
-        restAuthorMockMvc.perform(get("/api/authors/count?sort=id,desc&" + filter))
+        restAuthorMockMvc
+            .perform(get("/api/authors/count?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(content().string("0"));
@@ -426,8 +442,7 @@ public class AuthorResourceIT {
     @Transactional
     public void getNonExistingAuthor() throws Exception {
         // Get the author
-        restAuthorMockMvc.perform(get("/api/authors/{id}", Long.MAX_VALUE))
-            .andExpect(status().isNotFound());
+        restAuthorMockMvc.perform(get("/api/authors/{id}", Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
@@ -442,13 +457,10 @@ public class AuthorResourceIT {
         Author updatedAuthor = authorRepository.findById(author.getId()).get();
         // Disconnect from session so that the updates on updatedAuthor are not directly saved in db
         em.detach(updatedAuthor);
-        updatedAuthor
-            .firstName(UPDATED_FIRST_NAME)
-            .lastName(UPDATED_LAST_NAME);
+        updatedAuthor.firstName(UPDATED_FIRST_NAME).lastName(UPDATED_LAST_NAME);
 
-        restAuthorMockMvc.perform(put("/api/authors")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(updatedAuthor)))
+        restAuthorMockMvc
+            .perform(put("/api/authors").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(updatedAuthor)))
             .andExpect(status().isOk());
 
         // Validate the Author in the database
@@ -457,6 +469,9 @@ public class AuthorResourceIT {
         Author testAuthor = authorList.get(authorList.size() - 1);
         assertThat(testAuthor.getFirstName()).isEqualTo(UPDATED_FIRST_NAME);
         assertThat(testAuthor.getLastName()).isEqualTo(UPDATED_LAST_NAME);
+
+        // Validate the Author in Elasticsearch
+        verify(mockAuthorSearchRepository, times(2)).save(testAuthor);
     }
 
     @Test
@@ -465,14 +480,16 @@ public class AuthorResourceIT {
         int databaseSizeBeforeUpdate = authorRepository.findAll().size();
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        restAuthorMockMvc.perform(put("/api/authors")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(author)))
+        restAuthorMockMvc
+            .perform(put("/api/authors").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(author)))
             .andExpect(status().isBadRequest());
 
         // Validate the Author in the database
         List<Author> authorList = authorRepository.findAll();
         assertThat(authorList).hasSize(databaseSizeBeforeUpdate);
+
+        // Validate the Author in Elasticsearch
+        verify(mockAuthorSearchRepository, times(0)).save(author);
     }
 
     @Test
@@ -484,12 +501,34 @@ public class AuthorResourceIT {
         int databaseSizeBeforeDelete = authorRepository.findAll().size();
 
         // Delete the author
-        restAuthorMockMvc.perform(delete("/api/authors/{id}", author.getId())
-            .accept(MediaType.APPLICATION_JSON))
+        restAuthorMockMvc
+            .perform(delete("/api/authors/{id}", author.getId()).accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         List<Author> authorList = authorRepository.findAll();
         assertThat(authorList).hasSize(databaseSizeBeforeDelete - 1);
+
+        // Validate the Author in Elasticsearch
+        verify(mockAuthorSearchRepository, times(1)).deleteById(author.getId());
+    }
+
+    @Test
+    @Transactional
+    public void searchAuthor() throws Exception {
+        // Configure the mock search repository
+        // Initialize the database
+        authorService.save(author);
+        when(mockAuthorSearchRepository.search(queryStringQuery("id:" + author.getId()), PageRequest.of(0, 20)))
+            .thenReturn(new PageImpl<>(Collections.singletonList(author), PageRequest.of(0, 1), 1));
+
+        // Search the author
+        restAuthorMockMvc
+            .perform(get("/api/_search/authors?query=id:" + author.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(author.getId().intValue())))
+            .andExpect(jsonPath("$.[*].firstName").value(hasItem(DEFAULT_FIRST_NAME)))
+            .andExpect(jsonPath("$.[*].lastName").value(hasItem(DEFAULT_LAST_NAME)));
     }
 }

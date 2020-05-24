@@ -1,9 +1,13 @@
 package com.ishasamskriti.mylib.service;
 
+import com.ishasamskriti.mylib.domain.*; // for static metamodels
+import com.ishasamskriti.mylib.domain.Publisher;
+import com.ishasamskriti.mylib.repository.PublisherRepository;
+import com.ishasamskriti.mylib.repository.search.PublisherSearchRepository;
+import com.ishasamskriti.mylib.service.dto.PublisherCriteria;
+import io.github.jhipster.service.QueryService;
 import java.util.List;
-
 import javax.persistence.criteria.JoinType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -11,13 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import io.github.jhipster.service.QueryService;
-
-import com.ishasamskriti.mylib.domain.Publisher;
-import com.ishasamskriti.mylib.domain.*; // for static metamodels
-import com.ishasamskriti.mylib.repository.PublisherRepository;
-import com.ishasamskriti.mylib.service.dto.PublisherCriteria;
 
 /**
  * Service for executing complex queries for {@link Publisher} entities in the database.
@@ -28,13 +25,15 @@ import com.ishasamskriti.mylib.service.dto.PublisherCriteria;
 @Service
 @Transactional(readOnly = true)
 public class PublisherQueryService extends QueryService<Publisher> {
-
     private final Logger log = LoggerFactory.getLogger(PublisherQueryService.class);
 
     private final PublisherRepository publisherRepository;
 
-    public PublisherQueryService(PublisherRepository publisherRepository) {
+    private final PublisherSearchRepository publisherSearchRepository;
+
+    public PublisherQueryService(PublisherRepository publisherRepository, PublisherSearchRepository publisherSearchRepository) {
         this.publisherRepository = publisherRepository;
+        this.publisherSearchRepository = publisherSearchRepository;
     }
 
     /**

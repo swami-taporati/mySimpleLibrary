@@ -1,14 +1,21 @@
 package com.ishasamskriti.mylib.web.rest;
 
-import com.ishasamskriti.mylib.domain.Publisher;
-import com.ishasamskriti.mylib.service.PublisherService;
-import com.ishasamskriti.mylib.web.rest.errors.BadRequestAlertException;
-import com.ishasamskriti.mylib.service.dto.PublisherCriteria;
-import com.ishasamskriti.mylib.service.PublisherQueryService;
+import static org.elasticsearch.index.query.QueryBuilders.*;
 
+import com.ishasamskriti.mylib.domain.Publisher;
+import com.ishasamskriti.mylib.service.PublisherQueryService;
+import com.ishasamskriti.mylib.service.PublisherService;
+import com.ishasamskriti.mylib.service.dto.PublisherCriteria;
+import com.ishasamskriti.mylib.web.rest.errors.BadRequestAlertException;
 import io.github.jhipster.web.util.HeaderUtil;
 import io.github.jhipster.web.util.PaginationUtil;
 import io.github.jhipster.web.util.ResponseUtil;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.StreamSupport;
+import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,15 +23,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import javax.validation.Valid;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Optional;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * REST controller for managing {@link com.ishasamskriti.mylib.domain.Publisher}.
@@ -32,7 +33,6 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api")
 public class PublisherResource {
-
     private final Logger log = LoggerFactory.getLogger(PublisherResource.class);
 
     private static final String ENTITY_NAME = "publisher";
@@ -63,7 +63,8 @@ public class PublisherResource {
             throw new BadRequestAlertException("A new publisher cannot already have an ID", ENTITY_NAME, "idexists");
         }
         Publisher result = publisherService.save(publisher);
-        return ResponseEntity.created(new URI("/api/publishers/" + result.getId()))
+        return ResponseEntity
+            .created(new URI("/api/publishers/" + result.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
             .body(result);
     }
@@ -84,7 +85,8 @@ public class PublisherResource {
             throw new BadRequestAlertException("Invalid id", ENTITY_NAME, "idnull");
         }
         Publisher result = publisherService.save(publisher);
-        return ResponseEntity.ok()
+        return ResponseEntity
+            .ok()
             .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, publisher.getId().toString()))
             .body(result);
     }
@@ -140,6 +142,25 @@ public class PublisherResource {
         log.debug("REST request to delete Publisher : {}", id);
 
         publisherService.delete(id);
-        return ResponseEntity.noContent().headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString())).build();
+        return ResponseEntity
+            .noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
+    }
+
+    /**
+     * {@code SEARCH  /_search/publishers?query=:query} : search for the publisher corresponding
+     * to the query.
+     *
+     * @param query the query of the publisher search.
+     * @param pageable the pagination information.
+     * @return the result of the search.
+     */
+    @GetMapping("/_search/publishers")
+    public ResponseEntity<List<Publisher>> searchPublishers(@RequestParam String query, Pageable pageable) {
+        log.debug("REST request to search for a page of Publishers for query {}", query);
+        Page<Publisher> page = publisherService.search(query, pageable);
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
     }
 }

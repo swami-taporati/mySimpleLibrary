@@ -1,9 +1,13 @@
 package com.ishasamskriti.mylib.service;
 
+import com.ishasamskriti.mylib.domain.*; // for static metamodels
+import com.ishasamskriti.mylib.domain.Book;
+import com.ishasamskriti.mylib.repository.BookRepository;
+import com.ishasamskriti.mylib.repository.search.BookSearchRepository;
+import com.ishasamskriti.mylib.service.dto.BookCriteria;
+import io.github.jhipster.service.QueryService;
 import java.util.List;
-
 import javax.persistence.criteria.JoinType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -11,13 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import io.github.jhipster.service.QueryService;
-
-import com.ishasamskriti.mylib.domain.Book;
-import com.ishasamskriti.mylib.domain.*; // for static metamodels
-import com.ishasamskriti.mylib.repository.BookRepository;
-import com.ishasamskriti.mylib.service.dto.BookCriteria;
 
 /**
  * Service for executing complex queries for {@link Book} entities in the database.
@@ -28,13 +25,15 @@ import com.ishasamskriti.mylib.service.dto.BookCriteria;
 @Service
 @Transactional(readOnly = true)
 public class BookQueryService extends QueryService<Book> {
-
     private final Logger log = LoggerFactory.getLogger(BookQueryService.class);
 
     private final BookRepository bookRepository;
 
-    public BookQueryService(BookRepository bookRepository) {
+    private final BookSearchRepository bookSearchRepository;
+
+    public BookQueryService(BookRepository bookRepository, BookSearchRepository bookSearchRepository) {
         this.bookRepository = bookRepository;
+        this.bookSearchRepository = bookSearchRepository;
     }
 
     /**
@@ -98,12 +97,16 @@ public class BookQueryService extends QueryService<Book> {
                 specification = specification.and(buildSpecification(criteria.getStatus(), Book_.status));
             }
             if (criteria.getPublisherId() != null) {
-                specification = specification.and(buildSpecification(criteria.getPublisherId(),
-                    root -> root.join(Book_.publisher, JoinType.LEFT).get(Publisher_.id)));
+                specification =
+                    specification.and(
+                        buildSpecification(criteria.getPublisherId(), root -> root.join(Book_.publisher, JoinType.LEFT).get(Publisher_.id))
+                    );
             }
             if (criteria.getAuthorId() != null) {
-                specification = specification.and(buildSpecification(criteria.getAuthorId(),
-                    root -> root.join(Book_.authors, JoinType.LEFT).get(Author_.id)));
+                specification =
+                    specification.and(
+                        buildSpecification(criteria.getAuthorId(), root -> root.join(Book_.authors, JoinType.LEFT).get(Author_.id))
+                    );
             }
         }
         return specification;

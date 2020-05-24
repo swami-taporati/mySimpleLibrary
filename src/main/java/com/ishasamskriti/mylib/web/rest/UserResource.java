@@ -1,8 +1,11 @@
 package com.ishasamskriti.mylib.web.rest;
 
+import static org.elasticsearch.index.query.QueryBuilders.*;
+
 import com.ishasamskriti.mylib.config.Constants;
 import com.ishasamskriti.mylib.domain.User;
 import com.ishasamskriti.mylib.repository.UserRepository;
+import com.ishasamskriti.mylib.repository.search.UserSearchRepository;
 import com.ishasamskriti.mylib.security.AuthoritiesConstants;
 import com.ishasamskriti.mylib.service.MailService;
 import com.ishasamskriti.mylib.service.UserService;
@@ -16,6 +19,8 @@ import io.github.jhipster.web.util.ResponseUtil;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,10 +72,18 @@ public class UserResource {
 
     private final MailService mailService;
 
-    public UserResource(UserService userService, UserRepository userRepository, MailService mailService) {
+    private final UserSearchRepository userSearchRepository;
+
+    public UserResource(
+        UserService userService,
+        UserRepository userRepository,
+        MailService mailService,
+        UserSearchRepository userSearchRepository
+    ) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.mailService = mailService;
+        this.userSearchRepository = userSearchRepository;
     }
 
     /**
@@ -187,5 +200,16 @@ public class UserResource {
             .noContent()
             .headers(HeaderUtil.createAlert(applicationName, "A user is deleted with identifier " + login, login))
             .build();
+    }
+
+    /**
+     * {@code SEARCH /_search/users/:query} : search for the User corresponding to the query.
+     *
+     * @param query the query to search.
+     * @return the result of the search.
+     */
+    @GetMapping("/_search/users/{query}")
+    public List<User> search(@PathVariable String query) {
+        return StreamSupport.stream(userSearchRepository.search(queryStringQuery(query)).spliterator(), false).collect(Collectors.toList());
     }
 }

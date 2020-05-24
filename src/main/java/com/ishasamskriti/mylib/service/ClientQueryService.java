@@ -1,9 +1,13 @@
 package com.ishasamskriti.mylib.service;
 
+import com.ishasamskriti.mylib.domain.*; // for static metamodels
+import com.ishasamskriti.mylib.domain.Client;
+import com.ishasamskriti.mylib.repository.ClientRepository;
+import com.ishasamskriti.mylib.repository.search.ClientSearchRepository;
+import com.ishasamskriti.mylib.service.dto.ClientCriteria;
+import io.github.jhipster.service.QueryService;
 import java.util.List;
-
 import javax.persistence.criteria.JoinType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -11,13 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import io.github.jhipster.service.QueryService;
-
-import com.ishasamskriti.mylib.domain.Client;
-import com.ishasamskriti.mylib.domain.*; // for static metamodels
-import com.ishasamskriti.mylib.repository.ClientRepository;
-import com.ishasamskriti.mylib.service.dto.ClientCriteria;
 
 /**
  * Service for executing complex queries for {@link Client} entities in the database.
@@ -28,13 +25,15 @@ import com.ishasamskriti.mylib.service.dto.ClientCriteria;
 @Service
 @Transactional(readOnly = true)
 public class ClientQueryService extends QueryService<Client> {
-
     private final Logger log = LoggerFactory.getLogger(ClientQueryService.class);
 
     private final ClientRepository clientRepository;
 
-    public ClientQueryService(ClientRepository clientRepository) {
+    private final ClientSearchRepository clientSearchRepository;
+
+    public ClientQueryService(ClientRepository clientRepository, ClientSearchRepository clientSearchRepository) {
         this.clientRepository = clientRepository;
+        this.clientSearchRepository = clientSearchRepository;
     }
 
     /**

@@ -1,17 +1,14 @@
 package com.ishasamskriti.mylib.service;
 
 import com.ishasamskriti.mylib.domain.Book;
-
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import java.util.Optional;
 
 /**
  * Service Interface for managing {@link Book}.
  */
 public interface BookService {
-
     /**
      * Save a book.
      *
@@ -35,7 +32,6 @@ public interface BookService {
      */
     Page<Book> findAllWithEagerRelationships(Pageable pageable);
 
-
     /**
      * Get the "id" book.
      *
@@ -50,4 +46,14 @@ public interface BookService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Search for the book corresponding to the query.
+     *
+     * @param query the query of the search.
+     *
+     * @param pageable the pagination information.
+     * @return the list of entities.
+     */
+    Page<Book> search(String query, Pageable pageable);
 }

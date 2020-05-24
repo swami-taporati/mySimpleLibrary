@@ -5,21 +5,25 @@ import { RouterModule } from '@angular/router';
   imports: [
     RouterModule.forChild([
       {
-        path: 'publisher',
-        loadChildren: () => import('./publisher/publisher.module').then(m => m.MySimpleLibraryPublisherModule),
-      },
-      {
         path: 'author',
         loadChildren: () => import('./author/author.module').then(m => m.MySimpleLibraryAuthorModule),
       },
-      {
-        path: 'client',
-        loadChildren: () => import('./client/client.module').then(m => m.MySimpleLibraryClientModule),
-      },
+
       {
         path: 'book',
         loadChildren: () => import('./book/book.module').then(m => m.MySimpleLibraryBookModule),
       },
+
+      {
+        path: 'client',
+        loadChildren: () => import('./client/client.module').then(m => m.MySimpleLibraryClientModule),
+      },
+
+      {
+        path: 'publisher',
+        loadChildren: () => import('./publisher/publisher.module').then(m => m.MySimpleLibraryPublisherModule),
+      },
+
       {
         path: 'transaction',
         loadChildren: () => import('./transaction/transaction.module').then(m => m.MySimpleLibraryTransactionModule),

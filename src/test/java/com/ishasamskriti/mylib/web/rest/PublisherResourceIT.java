@@ -1,37 +1,45 @@
 package com.ishasamskriti.mylib.web.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.elasticsearch.index.query.QueryBuilders.queryStringQuery;
+import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.ishasamskriti.mylib.MySimpleLibraryApp;
 import com.ishasamskriti.mylib.domain.Publisher;
 import com.ishasamskriti.mylib.repository.PublisherRepository;
+import com.ishasamskriti.mylib.repository.search.PublisherSearchRepository;
+import com.ishasamskriti.mylib.service.PublisherQueryService;
 import com.ishasamskriti.mylib.service.PublisherService;
 import com.ishasamskriti.mylib.service.dto.PublisherCriteria;
-import com.ishasamskriti.mylib.service.PublisherQueryService;
-
+import java.util.Collections;
+import java.util.List;
+import javax.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import javax.persistence.EntityManager;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasItem;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Integration tests for the {@link PublisherResource} REST controller.
  */
 @SpringBootTest(classes = MySimpleLibraryApp.class)
+@ExtendWith(MockitoExtension.class)
 @AutoConfigureMockMvc
 @WithMockUser
 public class PublisherResourceIT {
-
     private static final String DEFAULT_NAME = "AAAAAAAAAA";
     private static final String UPDATED_NAME = "BBBBBBBBBB";
 
@@ -40,6 +48,14 @@ public class PublisherResourceIT {
 
     @Autowired
     private PublisherService publisherService;
+
+    /**
+     * This repository is mocked in the com.ishasamskriti.mylib.repository.search test package.
+     *
+     * @see com.ishasamskriti.mylib.repository.search.PublisherSearchRepositoryMockConfiguration
+     */
+    @Autowired
+    private PublisherSearchRepository mockPublisherSearchRepository;
 
     @Autowired
     private PublisherQueryService publisherQueryService;
@@ -59,10 +75,10 @@ public class PublisherResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Publisher createEntity(EntityManager em) {
-        Publisher publisher = new Publisher()
-            .name(DEFAULT_NAME);
+        Publisher publisher = new Publisher().name(DEFAULT_NAME);
         return publisher;
     }
+
     /**
      * Create an updated entity for this test.
      *
@@ -70,8 +86,7 @@ public class PublisherResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Publisher createUpdatedEntity(EntityManager em) {
-        Publisher publisher = new Publisher()
-            .name(UPDATED_NAME);
+        Publisher publisher = new Publisher().name(UPDATED_NAME);
         return publisher;
     }
 
@@ -85,9 +100,8 @@ public class PublisherResourceIT {
     public void createPublisher() throws Exception {
         int databaseSizeBeforeCreate = publisherRepository.findAll().size();
         // Create the Publisher
-        restPublisherMockMvc.perform(post("/api/publishers")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(publisher)))
+        restPublisherMockMvc
+            .perform(post("/api/publishers").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(publisher)))
             .andExpect(status().isCreated());
 
         // Validate the Publisher in the database
@@ -95,6 +109,9 @@ public class PublisherResourceIT {
         assertThat(publisherList).hasSize(databaseSizeBeforeCreate + 1);
         Publisher testPublisher = publisherList.get(publisherList.size() - 1);
         assertThat(testPublisher.getName()).isEqualTo(DEFAULT_NAME);
+
+        // Validate the Publisher in Elasticsearch
+        verify(mockPublisherSearchRepository, times(1)).save(testPublisher);
     }
 
     @Test
@@ -106,16 +123,17 @@ public class PublisherResourceIT {
         publisher.setId(1L);
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        restPublisherMockMvc.perform(post("/api/publishers")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(publisher)))
+        restPublisherMockMvc
+            .perform(post("/api/publishers").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(publisher)))
             .andExpect(status().isBadRequest());
 
         // Validate the Publisher in the database
         List<Publisher> publisherList = publisherRepository.findAll();
         assertThat(publisherList).hasSize(databaseSizeBeforeCreate);
-    }
 
+        // Validate the Publisher in Elasticsearch
+        verify(mockPublisherSearchRepository, times(0)).save(publisher);
+    }
 
     @Test
     @Transactional
@@ -126,10 +144,8 @@ public class PublisherResourceIT {
 
         // Create the Publisher, which fails.
 
-
-        restPublisherMockMvc.perform(post("/api/publishers")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(publisher)))
+        restPublisherMockMvc
+            .perform(post("/api/publishers").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(publisher)))
             .andExpect(status().isBadRequest());
 
         List<Publisher> publisherList = publisherRepository.findAll();
@@ -143,13 +159,14 @@ public class PublisherResourceIT {
         publisherRepository.saveAndFlush(publisher);
 
         // Get all the publisherList
-        restPublisherMockMvc.perform(get("/api/publishers?sort=id,desc"))
+        restPublisherMockMvc
+            .perform(get("/api/publishers?sort=id,desc"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(publisher.getId().intValue())))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)));
     }
-    
+
     @Test
     @Transactional
     public void getPublisher() throws Exception {
@@ -157,13 +174,13 @@ public class PublisherResourceIT {
         publisherRepository.saveAndFlush(publisher);
 
         // Get the publisher
-        restPublisherMockMvc.perform(get("/api/publishers/{id}", publisher.getId()))
+        restPublisherMockMvc
+            .perform(get("/api/publishers/{id}", publisher.getId()))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(publisher.getId().intValue()))
             .andExpect(jsonPath("$.name").value(DEFAULT_NAME));
     }
-
 
     @Test
     @Transactional
@@ -182,7 +199,6 @@ public class PublisherResourceIT {
         defaultPublisherShouldBeFound("id.lessThanOrEqual=" + id);
         defaultPublisherShouldNotBeFound("id.lessThan=" + id);
     }
-
 
     @Test
     @Transactional
@@ -235,7 +251,8 @@ public class PublisherResourceIT {
         // Get all the publisherList where name is null
         defaultPublisherShouldNotBeFound("name.specified=false");
     }
-                @Test
+
+    @Test
     @Transactional
     public void getAllPublishersByNameContainsSomething() throws Exception {
         // Initialize the database
@@ -265,14 +282,16 @@ public class PublisherResourceIT {
      * Executes the search, and checks that the default entity is returned.
      */
     private void defaultPublisherShouldBeFound(String filter) throws Exception {
-        restPublisherMockMvc.perform(get("/api/publishers?sort=id,desc&" + filter))
+        restPublisherMockMvc
+            .perform(get("/api/publishers?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(publisher.getId().intValue())))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)));
 
         // Check, that the count call also returns 1
-        restPublisherMockMvc.perform(get("/api/publishers/count?sort=id,desc&" + filter))
+        restPublisherMockMvc
+            .perform(get("/api/publishers/count?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(content().string("1"));
@@ -282,14 +301,16 @@ public class PublisherResourceIT {
      * Executes the search, and checks that the default entity is not returned.
      */
     private void defaultPublisherShouldNotBeFound(String filter) throws Exception {
-        restPublisherMockMvc.perform(get("/api/publishers?sort=id,desc&" + filter))
+        restPublisherMockMvc
+            .perform(get("/api/publishers?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$").isEmpty());
 
         // Check, that the count call also returns 0
-        restPublisherMockMvc.perform(get("/api/publishers/count?sort=id,desc&" + filter))
+        restPublisherMockMvc
+            .perform(get("/api/publishers/count?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(content().string("0"));
@@ -299,8 +320,7 @@ public class PublisherResourceIT {
     @Transactional
     public void getNonExistingPublisher() throws Exception {
         // Get the publisher
-        restPublisherMockMvc.perform(get("/api/publishers/{id}", Long.MAX_VALUE))
-            .andExpect(status().isNotFound());
+        restPublisherMockMvc.perform(get("/api/publishers/{id}", Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
@@ -315,12 +335,12 @@ public class PublisherResourceIT {
         Publisher updatedPublisher = publisherRepository.findById(publisher.getId()).get();
         // Disconnect from session so that the updates on updatedPublisher are not directly saved in db
         em.detach(updatedPublisher);
-        updatedPublisher
-            .name(UPDATED_NAME);
+        updatedPublisher.name(UPDATED_NAME);
 
-        restPublisherMockMvc.perform(put("/api/publishers")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(updatedPublisher)))
+        restPublisherMockMvc
+            .perform(
+                put("/api/publishers").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(updatedPublisher))
+            )
             .andExpect(status().isOk());
 
         // Validate the Publisher in the database
@@ -328,6 +348,9 @@ public class PublisherResourceIT {
         assertThat(publisherList).hasSize(databaseSizeBeforeUpdate);
         Publisher testPublisher = publisherList.get(publisherList.size() - 1);
         assertThat(testPublisher.getName()).isEqualTo(UPDATED_NAME);
+
+        // Validate the Publisher in Elasticsearch
+        verify(mockPublisherSearchRepository, times(2)).save(testPublisher);
     }
 
     @Test
@@ -336,14 +359,16 @@ public class PublisherResourceIT {
         int databaseSizeBeforeUpdate = publisherRepository.findAll().size();
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        restPublisherMockMvc.perform(put("/api/publishers")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(publisher)))
+        restPublisherMockMvc
+            .perform(put("/api/publishers").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(publisher)))
             .andExpect(status().isBadRequest());
 
         // Validate the Publisher in the database
         List<Publisher> publisherList = publisherRepository.findAll();
         assertThat(publisherList).hasSize(databaseSizeBeforeUpdate);
+
+        // Validate the Publisher in Elasticsearch
+        verify(mockPublisherSearchRepository, times(0)).save(publisher);
     }
 
     @Test
@@ -355,12 +380,33 @@ public class PublisherResourceIT {
         int databaseSizeBeforeDelete = publisherRepository.findAll().size();
 
         // Delete the publisher
-        restPublisherMockMvc.perform(delete("/api/publishers/{id}", publisher.getId())
-            .accept(MediaType.APPLICATION_JSON))
+        restPublisherMockMvc
+            .perform(delete("/api/publishers/{id}", publisher.getId()).accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         List<Publisher> publisherList = publisherRepository.findAll();
         assertThat(publisherList).hasSize(databaseSizeBeforeDelete - 1);
+
+        // Validate the Publisher in Elasticsearch
+        verify(mockPublisherSearchRepository, times(1)).deleteById(publisher.getId());
+    }
+
+    @Test
+    @Transactional
+    public void searchPublisher() throws Exception {
+        // Configure the mock search repository
+        // Initialize the database
+        publisherService.save(publisher);
+        when(mockPublisherSearchRepository.search(queryStringQuery("id:" + publisher.getId()), PageRequest.of(0, 20)))
+            .thenReturn(new PageImpl<>(Collections.singletonList(publisher), PageRequest.of(0, 1), 1));
+
+        // Search the publisher
+        restPublisherMockMvc
+            .perform(get("/api/_search/publishers?query=id:" + publisher.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(publisher.getId().intValue())))
+            .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)));
     }
 }

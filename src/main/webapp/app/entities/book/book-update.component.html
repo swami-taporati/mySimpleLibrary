@@ -87,7 +87,7 @@
                 <div class="form-group">
                     <label for="field_authors">Author</label>
                     <select class="form-control" id="field_authors" multiple name="authors" formControlName="authors">
-                        <option [ngValue]="getSelected(editForm.get('authors')!.value, authorOption)" *ngFor="let authorOption of authors; trackBy: trackById">{{ authorOption.firstName }}</option>
+                        <option [ngValue]="getSelected(editForm.get('authors')!.value, authorOption)" *ngFor="let authorOption of authors; trackBy: trackById">{{ authorOption.firstName }} {{ authorOption.lastName }}</option>
                     </select>
                 </div>
             </div>

@@ -1,41 +1,49 @@
 package com.ishasamskriti.mylib.web.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.elasticsearch.index.query.QueryBuilders.queryStringQuery;
+import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.ishasamskriti.mylib.MySimpleLibraryApp;
-import com.ishasamskriti.mylib.domain.Transaction;
 import com.ishasamskriti.mylib.domain.Book;
 import com.ishasamskriti.mylib.domain.Client;
+import com.ishasamskriti.mylib.domain.Transaction;
 import com.ishasamskriti.mylib.repository.TransactionRepository;
+import com.ishasamskriti.mylib.repository.search.TransactionSearchRepository;
+import com.ishasamskriti.mylib.service.TransactionQueryService;
 import com.ishasamskriti.mylib.service.TransactionService;
 import com.ishasamskriti.mylib.service.dto.TransactionCriteria;
-import com.ishasamskriti.mylib.service.TransactionQueryService;
-
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Collections;
+import java.util.List;
+import javax.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import javax.persistence.EntityManager;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasItem;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Integration tests for the {@link TransactionResource} REST controller.
  */
 @SpringBootTest(classes = MySimpleLibraryApp.class)
+@ExtendWith(MockitoExtension.class)
 @AutoConfigureMockMvc
 @WithMockUser
 public class TransactionResourceIT {
-
     private static final LocalDate DEFAULT_BORROW_DATE = LocalDate.ofEpochDay(0L);
     private static final LocalDate UPDATED_BORROW_DATE = LocalDate.now(ZoneId.systemDefault());
     private static final LocalDate SMALLER_BORROW_DATE = LocalDate.ofEpochDay(-1L);
@@ -49,6 +57,14 @@ public class TransactionResourceIT {
 
     @Autowired
     private TransactionService transactionService;
+
+    /**
+     * This repository is mocked in the com.ishasamskriti.mylib.repository.search test package.
+     *
+     * @see com.ishasamskriti.mylib.repository.search.TransactionSearchRepositoryMockConfiguration
+     */
+    @Autowired
+    private TransactionSearchRepository mockTransactionSearchRepository;
 
     @Autowired
     private TransactionQueryService transactionQueryService;
@@ -68,11 +84,10 @@ public class TransactionResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Transaction createEntity(EntityManager em) {
-        Transaction transaction = new Transaction()
-            .borrowDate(DEFAULT_BORROW_DATE)
-            .returnDate(DEFAULT_RETURN_DATE);
+        Transaction transaction = new Transaction().borrowDate(DEFAULT_BORROW_DATE).returnDate(DEFAULT_RETURN_DATE);
         return transaction;
     }
+
     /**
      * Create an updated entity for this test.
      *
@@ -80,9 +95,7 @@ public class TransactionResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Transaction createUpdatedEntity(EntityManager em) {
-        Transaction transaction = new Transaction()
-            .borrowDate(UPDATED_BORROW_DATE)
-            .returnDate(UPDATED_RETURN_DATE);
+        Transaction transaction = new Transaction().borrowDate(UPDATED_BORROW_DATE).returnDate(UPDATED_RETURN_DATE);
         return transaction;
     }
 
@@ -96,9 +109,10 @@ public class TransactionResourceIT {
     public void createTransaction() throws Exception {
         int databaseSizeBeforeCreate = transactionRepository.findAll().size();
         // Create the Transaction
-        restTransactionMockMvc.perform(post("/api/transactions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(transaction)))
+        restTransactionMockMvc
+            .perform(
+                post("/api/transactions").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(transaction))
+            )
             .andExpect(status().isCreated());
 
         // Validate the Transaction in the database
@@ -107,6 +121,9 @@ public class TransactionResourceIT {
         Transaction testTransaction = transactionList.get(transactionList.size() - 1);
         assertThat(testTransaction.getBorrowDate()).isEqualTo(DEFAULT_BORROW_DATE);
         assertThat(testTransaction.getReturnDate()).isEqualTo(DEFAULT_RETURN_DATE);
+
+        // Validate the Transaction in Elasticsearch
+        verify(mockTransactionSearchRepository, times(1)).save(testTransaction);
     }
 
     @Test
@@ -118,16 +135,19 @@ public class TransactionResourceIT {
         transaction.setId(1L);
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        restTransactionMockMvc.perform(post("/api/transactions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(transaction)))
+        restTransactionMockMvc
+            .perform(
+                post("/api/transactions").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(transaction))
+            )
             .andExpect(status().isBadRequest());
 
         // Validate the Transaction in the database
         List<Transaction> transactionList = transactionRepository.findAll();
         assertThat(transactionList).hasSize(databaseSizeBeforeCreate);
-    }
 
+        // Validate the Transaction in Elasticsearch
+        verify(mockTransactionSearchRepository, times(0)).save(transaction);
+    }
 
     @Test
     @Transactional
@@ -136,14 +156,15 @@ public class TransactionResourceIT {
         transactionRepository.saveAndFlush(transaction);
 
         // Get all the transactionList
-        restTransactionMockMvc.perform(get("/api/transactions?sort=id,desc"))
+        restTransactionMockMvc
+            .perform(get("/api/transactions?sort=id,desc"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(transaction.getId().intValue())))
             .andExpect(jsonPath("$.[*].borrowDate").value(hasItem(DEFAULT_BORROW_DATE.toString())))
             .andExpect(jsonPath("$.[*].returnDate").value(hasItem(DEFAULT_RETURN_DATE.toString())));
     }
-    
+
     @Test
     @Transactional
     public void getTransaction() throws Exception {
@@ -151,14 +172,14 @@ public class TransactionResourceIT {
         transactionRepository.saveAndFlush(transaction);
 
         // Get the transaction
-        restTransactionMockMvc.perform(get("/api/transactions/{id}", transaction.getId()))
+        restTransactionMockMvc
+            .perform(get("/api/transactions/{id}", transaction.getId()))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(transaction.getId().intValue()))
             .andExpect(jsonPath("$.borrowDate").value(DEFAULT_BORROW_DATE.toString()))
             .andExpect(jsonPath("$.returnDate").value(DEFAULT_RETURN_DATE.toString()));
     }
-
 
     @Test
     @Transactional
@@ -177,7 +198,6 @@ public class TransactionResourceIT {
         defaultTransactionShouldBeFound("id.lessThanOrEqual=" + id);
         defaultTransactionShouldNotBeFound("id.lessThan=" + id);
     }
-
 
     @Test
     @Transactional
@@ -283,7 +303,6 @@ public class TransactionResourceIT {
         defaultTransactionShouldBeFound("borrowDate.greaterThan=" + SMALLER_BORROW_DATE);
     }
 
-
     @Test
     @Transactional
     public void getAllTransactionsByReturnDateIsEqualToSomething() throws Exception {
@@ -388,7 +407,6 @@ public class TransactionResourceIT {
         defaultTransactionShouldBeFound("returnDate.greaterThan=" + SMALLER_RETURN_DATE);
     }
 
-
     @Test
     @Transactional
     public void getAllTransactionsByBookIsEqualToSomething() throws Exception {
@@ -407,7 +425,6 @@ public class TransactionResourceIT {
         // Get all the transactionList where book equals to bookId + 1
         defaultTransactionShouldNotBeFound("bookId.equals=" + (bookId + 1));
     }
-
 
     @Test
     @Transactional
@@ -432,7 +449,8 @@ public class TransactionResourceIT {
      * Executes the search, and checks that the default entity is returned.
      */
     private void defaultTransactionShouldBeFound(String filter) throws Exception {
-        restTransactionMockMvc.perform(get("/api/transactions?sort=id,desc&" + filter))
+        restTransactionMockMvc
+            .perform(get("/api/transactions?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(transaction.getId().intValue())))
@@ -440,7 +458,8 @@ public class TransactionResourceIT {
             .andExpect(jsonPath("$.[*].returnDate").value(hasItem(DEFAULT_RETURN_DATE.toString())));
 
         // Check, that the count call also returns 1
-        restTransactionMockMvc.perform(get("/api/transactions/count?sort=id,desc&" + filter))
+        restTransactionMockMvc
+            .perform(get("/api/transactions/count?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(content().string("1"));
@@ -450,14 +469,16 @@ public class TransactionResourceIT {
      * Executes the search, and checks that the default entity is not returned.
      */
     private void defaultTransactionShouldNotBeFound(String filter) throws Exception {
-        restTransactionMockMvc.perform(get("/api/transactions?sort=id,desc&" + filter))
+        restTransactionMockMvc
+            .perform(get("/api/transactions?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$").isEmpty());
 
         // Check, that the count call also returns 0
-        restTransactionMockMvc.perform(get("/api/transactions/count?sort=id,desc&" + filter))
+        restTransactionMockMvc
+            .perform(get("/api/transactions/count?sort=id,desc&" + filter))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(content().string("0"));
@@ -467,8 +488,7 @@ public class TransactionResourceIT {
     @Transactional
     public void getNonExistingTransaction() throws Exception {
         // Get the transaction
-        restTransactionMockMvc.perform(get("/api/transactions/{id}", Long.MAX_VALUE))
-            .andExpect(status().isNotFound());
+        restTransactionMockMvc.perform(get("/api/transactions/{id}", Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
@@ -483,13 +503,14 @@ public class TransactionResourceIT {
         Transaction updatedTransaction = transactionRepository.findById(transaction.getId()).get();
         // Disconnect from session so that the updates on updatedTransaction are not directly saved in db
         em.detach(updatedTransaction);
-        updatedTransaction
-            .borrowDate(UPDATED_BORROW_DATE)
-            .returnDate(UPDATED_RETURN_DATE);
+        updatedTransaction.borrowDate(UPDATED_BORROW_DATE).returnDate(UPDATED_RETURN_DATE);
 
-        restTransactionMockMvc.perform(put("/api/transactions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(updatedTransaction)))
+        restTransactionMockMvc
+            .perform(
+                put("/api/transactions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(TestUtil.convertObjectToJsonBytes(updatedTransaction))
+            )
             .andExpect(status().isOk());
 
         // Validate the Transaction in the database
@@ -498,6 +519,9 @@ public class TransactionResourceIT {
         Transaction testTransaction = transactionList.get(transactionList.size() - 1);
         assertThat(testTransaction.getBorrowDate()).isEqualTo(UPDATED_BORROW_DATE);
         assertThat(testTransaction.getReturnDate()).isEqualTo(UPDATED_RETURN_DATE);
+
+        // Validate the Transaction in Elasticsearch
+        verify(mockTransactionSearchRepository, times(2)).save(testTransaction);
     }
 
     @Test
@@ -506,14 +530,18 @@ public class TransactionResourceIT {
         int databaseSizeBeforeUpdate = transactionRepository.findAll().size();
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        restTransactionMockMvc.perform(put("/api/transactions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(TestUtil.convertObjectToJsonBytes(transaction)))
+        restTransactionMockMvc
+            .perform(
+                put("/api/transactions").contentType(MediaType.APPLICATION_JSON).content(TestUtil.convertObjectToJsonBytes(transaction))
+            )
             .andExpect(status().isBadRequest());
 
         // Validate the Transaction in the database
         List<Transaction> transactionList = transactionRepository.findAll();
         assertThat(transactionList).hasSize(databaseSizeBeforeUpdate);
+
+        // Validate the Transaction in Elasticsearch
+        verify(mockTransactionSearchRepository, times(0)).save(transaction);
     }
 
     @Test
@@ -525,12 +553,34 @@ public class TransactionResourceIT {
         int databaseSizeBeforeDelete = transactionRepository.findAll().size();
 
         // Delete the transaction
-        restTransactionMockMvc.perform(delete("/api/transactions/{id}", transaction.getId())
-            .accept(MediaType.APPLICATION_JSON))
+        restTransactionMockMvc
+            .perform(delete("/api/transactions/{id}", transaction.getId()).accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         List<Transaction> transactionList = transactionRepository.findAll();
         assertThat(transactionList).hasSize(databaseSizeBeforeDelete - 1);
+
+        // Validate the Transaction in Elasticsearch
+        verify(mockTransactionSearchRepository, times(1)).deleteById(transaction.getId());
+    }
+
+    @Test
+    @Transactional
+    public void searchTransaction() throws Exception {
+        // Configure the mock search repository
+        // Initialize the database
+        transactionService.save(transaction);
+        when(mockTransactionSearchRepository.search(queryStringQuery("id:" + transaction.getId()), PageRequest.of(0, 20)))
+            .thenReturn(new PageImpl<>(Collections.singletonList(transaction), PageRequest.of(0, 1), 1));
+
+        // Search the transaction
+        restTransactionMockMvc
+            .perform(get("/api/_search/transactions?query=id:" + transaction.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(transaction.getId().intValue())))
+            .andExpect(jsonPath("$.[*].borrowDate").value(hasItem(DEFAULT_BORROW_DATE.toString())))
+            .andExpect(jsonPath("$.[*].returnDate").value(hasItem(DEFAULT_RETURN_DATE.toString())));
     }
 }

@@ -1,14 +1,21 @@
 package com.ishasamskriti.mylib.web.rest;
 
-import com.ishasamskriti.mylib.domain.Client;
-import com.ishasamskriti.mylib.service.ClientService;
-import com.ishasamskriti.mylib.web.rest.errors.BadRequestAlertException;
-import com.ishasamskriti.mylib.service.dto.ClientCriteria;
-import com.ishasamskriti.mylib.service.ClientQueryService;
+import static org.elasticsearch.index.query.QueryBuilders.*;
 
+import com.ishasamskriti.mylib.domain.Client;
+import com.ishasamskriti.mylib.service.ClientQueryService;
+import com.ishasamskriti.mylib.service.ClientService;
+import com.ishasamskriti.mylib.service.dto.ClientCriteria;
+import com.ishasamskriti.mylib.web.rest.errors.BadRequestAlertException;
 import io.github.jhipster.web.util.HeaderUtil;
 import io.github.jhipster.web.util.PaginationUtil;
 import io.github.jhipster.web.util.ResponseUtil;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.StreamSupport;
+import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,15 +23,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import javax.validation.Valid;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Optional;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * REST controller for managing {@link com.ishasamskriti.mylib.domain.Client}.
@@ -32,7 +33,6 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api")
 public class ClientResource {
-
     private final Logger log = LoggerFactory.getLogger(ClientResource.class);
 
     private static final String ENTITY_NAME = "client";
@@ -63,7 +63,8 @@ public class ClientResource {
             throw new BadRequestAlertException("A new client cannot already have an ID", ENTITY_NAME, "idexists");
         }
         Client result = clientService.save(client);
-        return ResponseEntity.created(new URI("/api/clients/" + result.getId()))
+        return ResponseEntity
+            .created(new URI("/api/clients/" + result.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
             .body(result);
     }
@@ -84,7 +85,8 @@ public class ClientResource {
             throw new BadRequestAlertException("Invalid id", ENTITY_NAME, "idnull");
         }
         Client result = clientService.save(client);
-        return ResponseEntity.ok()
+        return ResponseEntity
+            .ok()
             .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, client.getId().toString()))
             .body(result);
     }
@@ -140,6 +142,25 @@ public class ClientResource {
         log.debug("REST request to delete Client : {}", id);
 
         clientService.delete(id);
-        return ResponseEntity.noContent().headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString())).build();
+        return ResponseEntity
+            .noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
+    }
+
+    /**
+     * {@code SEARCH  /_search/clients?query=:query} : search for the client corresponding
+     * to the query.
+     *
+     * @param query the query of the client search.
+     * @param pageable the pagination information.
+     * @return the result of the search.
+     */
+    @GetMapping("/_search/clients")
+    public ResponseEntity<List<Client>> searchClients(@RequestParam String query, Pageable pageable) {
+        log.debug("REST request to search for a page of Clients for query {}", query);
+        Page<Client> page = clientService.search(query, pageable);
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
     }
 }

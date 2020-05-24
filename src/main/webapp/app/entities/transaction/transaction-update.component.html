@@ -35,8 +35,10 @@
                     <label class="form-control-label" for="field_book">Book</label>
                     <select class="form-control" id="field_book" name="book" formControlName="book">
                         <option [ngValue]="null"></option>
-                        <option [ngValue]="bookOption.id === editForm.get('book')!.value?.id ? editForm.get('book')!.value : bookOption" *ngFor="let bookOption of books; trackBy: trackById">{{ bookOption.name }}</option>
-                    </select>
+                        
+                        <option  [ngValue]="bookOption.id === editForm.get('book')!.value?.id ? editForm.get('book')!.value : bookOption" *ngFor="let bookOption of books; trackBy: trackById">
+                            {{ bookOption.name }} , {{bookOption.status}}  </option> 
+                         </select>
                 </div>
 
                 <div class="form-group">

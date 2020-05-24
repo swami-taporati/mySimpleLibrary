@@ -18,6 +18,7 @@ import { ClientDeleteDialogComponent } from './client-delete-dialog.component';
 export class ClientComponent implements OnInit, OnDestroy {
   clients?: IClient[];
   eventSubscriber?: Subscription;
+  currentSearch: string;
   totalItems = 0;
   itemsPerPage = ITEMS_PER_PAGE;
   page!: number;
@@ -31,10 +32,30 @@ export class ClientComponent implements OnInit, OnDestroy {
     protected router: Router,
     protected eventManager: JhiEventManager,
     protected modalService: NgbModal
-  ) {}
+  ) {
+    this.currentSearch =
+      this.activatedRoute.snapshot && this.activatedRoute.snapshot.queryParams['search']
+        ? this.activatedRoute.snapshot.queryParams['search']
+        : '';
+  }
 
   loadPage(page?: number): void {
     const pageToLoad: number = page || this.page;
+
+    if (this.currentSearch) {
+      this.clientService
+        .search({
+          page: pageToLoad - 1,
+          query: this.currentSearch,
+          size: this.itemsPerPage,
+          sort: this.sort(),
+        })
+        .subscribe(
+          (res: HttpResponse<IClient[]>) => this.onSuccess(res.body, res.headers, pageToLoad),
+          () => this.onError()
+        );
+      return;
+    }
 
     this.clientService
       .query({
@@ -46,6 +67,11 @@ export class ClientComponent implements OnInit, OnDestroy {
         (res: HttpResponse<IClient[]>) => this.onSuccess(res.body, res.headers, pageToLoad),
         () => this.onError()
       );
+  }
+
+  search(query: string): void {
+    this.currentSearch = query;
+    this.loadPage(1);
   }
 
   ngOnInit(): void {
@@ -109,10 +135,12 @@ export class ClientComponent implements OnInit, OnDestroy {
   protected onSuccess(data: IClient[] | null, headers: HttpHeaders, page: number): void {
     this.totalItems = Number(headers.get('X-Total-Count'));
     this.page = page;
+    this.ngbPaginationPage = this.page;
     this.router.navigate(['/client'], {
       queryParams: {
         page: this.page,
         size: this.itemsPerPage,
+        search: this.currentSearch,
         sort: this.predicate + ',' + (this.ascending ? 'asc' : 'desc'),
       },
     });

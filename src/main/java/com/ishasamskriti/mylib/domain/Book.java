@@ -1,16 +1,14 @@
 package com.ishasamskriti.mylib.domain;
 
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
-
-import javax.persistence.*;
-import javax.validation.constraints.*;
-
+import com.ishasamskriti.mylib.domain.enumeration.BookStatus;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
-
-import com.ishasamskriti.mylib.domain.enumeration.BookStatus;
+import javax.persistence.*;
+import javax.validation.constraints.*;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.springframework.data.elasticsearch.annotations.FieldType;
 
 /**
  * A Book.
@@ -18,8 +16,8 @@ import com.ishasamskriti.mylib.domain.enumeration.BookStatus;
 @Entity
 @Table(name = "book")
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+@org.springframework.data.elasticsearch.annotations.Document(indexName = "book")
 public class Book implements Serializable {
-
     private static final long serialVersionUID = 1L;
 
     @Id
@@ -51,9 +49,11 @@ public class Book implements Serializable {
 
     @ManyToMany
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-    @JoinTable(name = "book_author",
-               joinColumns = @JoinColumn(name = "book_id", referencedColumnName = "id"),
-               inverseJoinColumns = @JoinColumn(name = "author_id", referencedColumnName = "id"))
+    @JoinTable(
+        name = "book_author",
+        joinColumns = @JoinColumn(name = "book_id", referencedColumnName = "id"),
+        inverseJoinColumns = @JoinColumn(name = "author_id", referencedColumnName = "id")
+    )
     private Set<Author> authors = new HashSet<>();
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
@@ -154,6 +154,7 @@ public class Book implements Serializable {
     public void setAuthors(Set<Author> authors) {
         this.authors = authors;
     }
+
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here
 
     @Override

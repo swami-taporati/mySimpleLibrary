@@ -15,7 +15,7 @@
     "databaseType": "sql",
     "devDatabaseType": "mysql",
     "prodDatabaseType": "mysql",
-    "searchEngine": false,
+    "searchEngine": "elasticsearch",
     "enableSwaggerCodegen": false,
     "messageBroker": false,
     "buildTool": "maven",

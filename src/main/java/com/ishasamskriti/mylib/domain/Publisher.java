@@ -1,12 +1,11 @@
 package com.ishasamskriti.mylib.domain;
 
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
-
+import java.io.Serializable;
 import javax.persistence.*;
 import javax.validation.constraints.*;
-
-import java.io.Serializable;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.springframework.data.elasticsearch.annotations.FieldType;
 
 /**
  * A Publisher.
@@ -14,8 +13,8 @@ import java.io.Serializable;
 @Entity
 @Table(name = "publisher")
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+@org.springframework.data.elasticsearch.annotations.Document(indexName = "publisher")
 public class Publisher implements Serializable {
-
     private static final long serialVersionUID = 1L;
 
     @Id
@@ -48,6 +47,7 @@ public class Publisher implements Serializable {
     public void setName(String name) {
         this.name = name;
     }
+
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here
 
     @Override

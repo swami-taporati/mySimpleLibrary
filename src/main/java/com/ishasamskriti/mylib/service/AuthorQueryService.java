@@ -1,9 +1,13 @@
 package com.ishasamskriti.mylib.service;
 
+import com.ishasamskriti.mylib.domain.*; // for static metamodels
+import com.ishasamskriti.mylib.domain.Author;
+import com.ishasamskriti.mylib.repository.AuthorRepository;
+import com.ishasamskriti.mylib.repository.search.AuthorSearchRepository;
+import com.ishasamskriti.mylib.service.dto.AuthorCriteria;
+import io.github.jhipster.service.QueryService;
 import java.util.List;
-
 import javax.persistence.criteria.JoinType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -11,13 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import io.github.jhipster.service.QueryService;
-
-import com.ishasamskriti.mylib.domain.Author;
-import com.ishasamskriti.mylib.domain.*; // for static metamodels
-import com.ishasamskriti.mylib.repository.AuthorRepository;
-import com.ishasamskriti.mylib.service.dto.AuthorCriteria;
 
 /**
  * Service for executing complex queries for {@link Author} entities in the database.
@@ -28,13 +25,15 @@ import com.ishasamskriti.mylib.service.dto.AuthorCriteria;
 @Service
 @Transactional(readOnly = true)
 public class AuthorQueryService extends QueryService<Author> {
-
     private final Logger log = LoggerFactory.getLogger(AuthorQueryService.class);
 
     private final AuthorRepository authorRepository;
 
-    public AuthorQueryService(AuthorRepository authorRepository) {
+    private final AuthorSearchRepository authorSearchRepository;
+
+    public AuthorQueryService(AuthorRepository authorRepository, AuthorSearchRepository authorSearchRepository) {
         this.authorRepository = authorRepository;
+        this.authorSearchRepository = authorSearchRepository;
     }
 
     /**
@@ -92,8 +91,10 @@ public class AuthorQueryService extends QueryService<Author> {
                 specification = specification.and(buildStringSpecification(criteria.getLastName(), Author_.lastName));
             }
             if (criteria.getBookId() != null) {
-                specification = specification.and(buildSpecification(criteria.getBookId(),
-                    root -> root.join(Author_.books, JoinType.LEFT).get(Book_.id)));
+                specification =
+                    specification.and(
+                        buildSpecification(criteria.getBookId(), root -> root.join(Author_.books, JoinType.LEFT).get(Book_.id))
+                    );
             }
         }
         return specification;

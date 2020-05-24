@@ -1,17 +1,18 @@
 package com.ishasamskriti.mylib.service.impl;
 
-import com.ishasamskriti.mylib.service.BookService;
+import static org.elasticsearch.index.query.QueryBuilders.*;
+
 import com.ishasamskriti.mylib.domain.Book;
 import com.ishasamskriti.mylib.repository.BookRepository;
+import com.ishasamskriti.mylib.repository.search.BookSearchRepository;
+import com.ishasamskriti.mylib.service.BookService;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 /**
  * Service Implementation for managing {@link Book}.
@@ -19,13 +20,15 @@ import java.util.Optional;
 @Service
 @Transactional
 public class BookServiceImpl implements BookService {
-
     private final Logger log = LoggerFactory.getLogger(BookServiceImpl.class);
 
     private final BookRepository bookRepository;
 
-    public BookServiceImpl(BookRepository bookRepository) {
+    private final BookSearchRepository bookSearchRepository;
+
+    public BookServiceImpl(BookRepository bookRepository, BookSearchRepository bookSearchRepository) {
         this.bookRepository = bookRepository;
+        this.bookSearchRepository = bookSearchRepository;
     }
 
     /**
@@ -37,7 +40,9 @@ public class BookServiceImpl implements BookService {
     @Override
     public Book save(Book book) {
         log.debug("Request to save Book : {}", book);
-        return bookRepository.save(book);
+        Book result = bookRepository.save(book);
+        bookSearchRepository.save(result);
+        return result;
     }
 
     /**
@@ -52,7 +57,6 @@ public class BookServiceImpl implements BookService {
         log.debug("Request to get all Books");
         return bookRepository.findAll(pageable);
     }
-
 
     /**
      * Get all the books with eager load of many-to-many relationships.
@@ -86,5 +90,20 @@ public class BookServiceImpl implements BookService {
         log.debug("Request to delete Book : {}", id);
 
         bookRepository.deleteById(id);
+        bookSearchRepository.deleteById(id);
+    }
+
+    /**
+     * Search for the book corresponding to the query.
+     *
+     * @param query the query of the search.
+     * @param pageable the pagination information.
+     * @return the list of entities.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Book> search(String query, Pageable pageable) {
+        log.debug("Request to search for a page of Books for query {}", query);
+        return bookSearchRepository.search(queryStringQuery(query), pageable);
     }
 }
